@@ -1,0 +1,237 @@
+---
+title: "Modeling and prediction for IMDB scoring system of movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+
+### *Analysed by **Kashif Nawaz***
+
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+library(scales)
+require(gridExtra)
+library(broom)
+```
+
+### Load data
+
+```{r load-data}
+load("movies.RData")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The given dataset contain 651 randomly selected movies information collected from IMDB and Rotten Tomatoes. All 651 movies are released between 1970 to 2014, and the number of variables for each observation are 32; description of each variable shown [here](https://d3c33hcgiwev3.cloudfront.net/_73393031e98b997cf2445132f89606a1_movies_codebook.html?Expires=1588204800&Signature=IV9bMVjDtUNqxu30iUWk8XhruG9fXY2jLobZjImhz1CXpVzZ3YoMDfSJvSO1nw1T9XHEEiQR-j5f75vJMnd9dT3tNcc3t4tbuWLfxWb~p0dLGTEXlxpcg08VBo2jf2jt~2xAJCpHW4~dr94VAkZGqpq3FxhJkeCMqX55B1aRFYs_&Key-Pair-Id=APKAJLTNE6QMUY6HBC5A). The method of collection of this dataset and for the purpose of this project it is only possible to do an observational study and no causal analysis is done. The study can generalize for movies released between 1970 to 2014.
+
+Because some of the variables are irrelevant to the purpose this project which is identifying the popularity of a movie, they are removed.
+
+```{r}
+my_movies <- movies[,c(3,13,16,18,20,21,23,24)]
+
+```
+
+
+* * *
+
+## Part 2: Research question
+
+For the present study we want to determine how does the 
+
+*genre of movie*, 
+
+*critics score*, 
+
+*audience score*, 
+
+*whether or not the movie won a best picture Oscar*, 
+
+*whether or not one of the main actors/director in the movie ever won an Oscar* and
+
+*whether or not the movie is in the Top 200 Box Office list on BoxOfficeMojo* 
+
+affects or relates to the IMDB score of a movie?
+
+Answering this question can leads to determine what features are more dominant to obtain the IMDB scoring system.
+
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+To get the overall idea of the whole dataset we first use *summary* command, which yield the description of each and every variable (column).
+
+```{r Table1}
+summary(my_movies)
+```
+*Table1: Summary statistics of whole dataset*
+
+
+
+As you can see here variable **genre** has 11 different categories. Apart from that variable **best_pic_win**, **best_actor_win**, and **best_dir_win** are categorical variable with output yes or no. All these 4 categorical variable are shown in the form of barplot in figure 1. 
+
+
+```{r fig1, fig.height=5}
+p1 <- ggplot(my_movies %>% count(genre) %>% mutate(num = n ), aes(x = reorder(genre, -num), y = num,fill=genre)) + geom_bar(stat = "identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + ggtitle("A. Movie genre distribution") +  xlab("Genre (category)") + ylab("Number") +theme(legend.position = "none")
+p2 <- ggplot(my_movies, aes(best_pic_win,fill=best_pic_win)) + geom_bar() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + ggtitle("B. Movie won the Oscar") +  xlab("Movie won the Oscar") + ylab("Number (yes/no)")+theme(legend.position = "none")
+p3 <- ggplot(my_movies, aes(best_actor_win,fill=best_actor_win)) + geom_bar() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + ggtitle("C. Actor won the Oscar") +  xlab("Actor won the Oscar") + ylab("Number (yes/no)")+theme(legend.position = "none")
+p4 <- ggplot(my_movies, aes(best_dir_win,fill=best_dir_win)) + geom_bar() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + ggtitle("D. Director won the Oscar") +  xlab("Director won the Oscar") + ylab("Number (yes/no)")+theme(legend.position = "none") 
+p5 <- ggplot(my_movies, aes(top200_box,fill=top200_box)) + geom_bar() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + ggtitle("E. Top 200 boxoffice") +  xlab("Top 200 boxoffice") + ylab("Number (yes/no)")+theme(legend.position = "none") 
+grid.arrange(p1, p2+coord_flip(),p3+coord_flip(),p4+coord_flip(),p5+coord_flip(), nrow = 2, layout_matrix = rbind(c(1, 1, 1,1),c(1, 1, 1,1),c(1, 1, 1,1),c(1, 1, 1,1),c(1, 1, 1,1),c(1, 1, 1,1),c(1, 1, 1,1),c(1, 1, 1,1),c(2, 3, 4,5),c(2, 3, 4,5),c(2, 3, 4,5),c(2, 3, 4,5)))
+```
+
+
+*Figure 1: Barplots for Genre of movies, best picture award, main actors award and director award.*
+ 
+Along with the above 4 categorical variable there are 3 numerical variable: **imdb_rating**, **critics_score**, **audience_score**. Density plot of these are shown in figure 2. Vertical dashed line is mean of the respective sample. 
+
+
+```{r fig2, fig.height=3}
+p1 <- ggplot(my_movies, aes(x=imdb_rating)) + geom_histogram(aes(y=..density..), colour="black", fill="white")+ geom_density(alpha=.2, fill="red") + geom_vline(aes(xintercept=mean(imdb_rating)), color="blue", linetype="dashed", size=1)
+p2 <- ggplot(my_movies, aes(x=critics_score)) + geom_histogram(aes(y=..density..), colour="black", fill="white")+ geom_density(alpha=.2, fill="green") + geom_vline(aes(xintercept=mean(critics_score)), color="blue", linetype="dashed", size=1)
+p3 <- ggplot(my_movies, aes(x=audience_score)) + geom_histogram(aes(y=..density..), colour="black", fill="white")+ geom_density(alpha=.2, fill="yellow") + geom_vline(aes(xintercept=mean(audience_score)), color="blue", linetype="dashed", size=1)
+grid.arrange(p1, p2,p3, nrow = 1, ncol = 3, layout_matrix = rbind(c(1, 2, 3)))
+
+```
+
+*Figure 2: Density plot of IMDB rating, Critics score and Audience score. Blue dashed line is mean of respective sample.*
+
+
+
+```{r fig3, fig.height=10}
+p1 <- ggplot(my_movies, aes(x=imdb_rating, y=best_pic_win, group=best_pic_win, fill=best_pic_win)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("A. IMDB: Movie") +  xlab("IMDB rating")+ylab("Movie-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p2 <- ggplot(my_movies, aes(x=critics_score, y=best_pic_win, group=best_pic_win, fill=best_pic_win)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("B. Critics: Movie") +  xlab("Critics score")+ylab("Movie-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p3 <- ggplot(my_movies, aes(x=audience_score, y=best_pic_win, group=best_pic_win, fill=best_pic_win)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("C. Audience: Movie") +  xlab("Audience score")+ylab("Movie-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p4 <- ggplot(my_movies, aes(x=imdb_rating, y=best_dir_win, group=best_dir_win, fill=best_dir_win)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("D. IMDB: Director") +  xlab("IMDB rating")+ylab("Director-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p5 <- ggplot(my_movies, aes(x=critics_score, y=best_dir_win, group=best_dir_win, fill=best_dir_win)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("E. Critics: Director") +  xlab("Critics score")+ylab("Director-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p6 <- ggplot(my_movies, aes(x=audience_score, y=best_dir_win, group=best_dir_win, fill=best_dir_win)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("F. Audience: Director") +  xlab("Audience score")+ylab("Director-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p7 <- ggplot(my_movies, aes(x=imdb_rating, y=best_actor_win, group=best_actor_win, fill=best_actor_win)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("G. IMDB: Actor") +  xlab("IMDB rating")+ylab("Actor-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p8 <- ggplot(my_movies, aes(x=critics_score, y=best_actor_win, group=best_actor_win, fill=best_actor_win)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("H. Critics: Actor") +  xlab("Critics score")+ylab("Actor-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p9 <- ggplot(my_movies, aes(x=audience_score, y=best_actor_win, group=best_actor_win, fill=best_actor_win)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("I. Audience: Actor") +  xlab("Audience score")+ylab("Actor-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p10 <- ggplot(my_movies, aes(x=imdb_rating, y=top200_box, group=top200_box, fill=top200_box)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("J. IMDB: Actor") +  xlab("IMDB rating")+ylab("Actor-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p11 <- ggplot(my_movies, aes(x=critics_score, y=top200_box, group=top200_box, fill=top200_box)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("K. Critics: Actor") +  xlab("Critics score")+ylab("Actor-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+p12 <- ggplot(my_movies, aes(x=audience_score, y=top200_box, group=top200_box, fill=top200_box)) + geom_boxplot(outlier.size = -1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("L. Audience: Actor") +  xlab("Audience score")+ylab("Actor-Oscar-win") + coord_flip() + stat_boxplot(geom ='errorbar',width=0.3)+theme(legend.position = "none")
+grid.arrange(p1, p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12, nrow = 4, ncol = 3, layout_matrix = rbind(c(1, 2, 3), c(4, 5, 6), c(7, 8, 9), c(10, 11, 12)))
+```
+
+*Figure 3: Boxplots of IMDB rating, Critics score and Audience score in context of each categorical variable (except genre). First row in context of  best_pic_win, second row: best_dir_win, third row: best_actor_win and fourth row in context of top200_box.* 
+
+To measure the central tendency of numerical variable (IMDB rating, Critics score and Audience score), we plotted the boxplot, and each boxplot is subdivided into yes and no, in terms of each categorical variable (best_pic_win, best_dir_win, best_actor_win and top200_box).
+
+It can be seen that all numerical variables has higher *no* percentage in best_pic_win (first row), while lowest or equivalent to *yes* in best_actor_win category. This means that actors has much more chance (or rate) to win the Oscar compare to the movies (or director, or being in top200 boxoffice). 
+
+
+
+* * *
+
+## Part 4: Modeling
+
+
+To predict the role all the variable for deciding the IMDB rating, we used multiple linear regression (MLR). We start with fitting all seven variables (explanatory) with imdb_rating variable (response); all explanatory variables are described in previous sections. We used **backward elimination with adjusted R2**, which includes step by step removal of each explanatory variable (irrespective of significant p-values) to obtain the maximum adjusted R2. Main advantage of using backward elimination with adjusted R2 is that it allows to include all explanatory variables in the beginning. 
+
+First, we fitted the model (my_model) with all 7 explanatory variables, which yielded adjusted R2 of 0.8093 with the significance of p-value: < 2.2e-16. This my_model is described in table 2.
+
+
+```{r Table2}
+my_model <- lm(imdb_rating~.,data=my_movies)
+summary(my_model)
+```
+
+*Table 2: Initial fitted model with all 7 explanatory variables.*
+
+
+Instead of removing one by one each explanatory variable, we have used [**step**](https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/step) from R. This function yields the final model with maximum adjusted R2 value.
+Summary of this final_model is shown in Table 3. Note here adjusted R2 become **0.8097** from 0.8093, and number of explanatory variables decreased from 7 to 5(best_pic_win and top200_boxyes were removed).
+
+
+```{r Table3}
+final_model<-step(my_model, direction = "both", trace=FALSE ) 
+summary(final_model)
+```
+
+*Table 3: Final fitted model (final_model) with all 5 explanatory variables.*
+
+Here, adjusted R2 become **0.8097** which means nearly 81% of the data can be explainable with this model. 
+
+
+To check how significant or authentic our final model is we plotted residual scatter plot, residual histogram and residual vs fitted scatter plot. 
+
+```{r fig4, fig.height=8, fig.width=4}
+df <- augment(final_model)
+p1 <- ggplot() + geom_jitter(data=df, aes(y=.resid, x=1),size = .1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("A. Residual scatter plot") +ylab("Residuals")
+p2 <- ggplot(df, aes(x=.resid)) + geom_histogram(aes(y=..density..), colour="black", fill="white")+ geom_density(alpha=.2, fill="black") + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("B. Residual histogram") +xlab("Residuals") + ylab("Density")
+p3 <- ggplot() + geom_jitter(data=df, aes(y=.resid, x=.fitted),size = .1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("C. Residual vs Fitted scatter plot") +ylab("Residuals") + xlab("Fitted")
+   
+grid.arrange(p1, p2, p3, nrow = 3, ncol = 1)
+
+```
+
+*Figure 4: A. Residual scatter plot, B. Residual histogram and C. Residual vs fitted scatter plot.* 
+
+Along with this we also plotted qqnorm plot.
+
+
+```{r fig5, fig.height=5, fig.width=4}
+
+qqnorm(resid(final_model), pch=20, xlim=c(-2,2), ylim = c(-2,2)) 
+qqline(resid(final_model))
+
+```
+
+*Figure 5: A. Normal Q-Q plot.* 
+
+Residual histogram (Fig. 4B) show left skewness but qqnorm plot shows (Fig. 5) deviation in tail regions. Residual scatted plot (Fig. 4A) shown that residuals scattered along 0, which is another indication of better model. 
+
+We also plotted the residuals vs other 2 numerical variables (Critics score and Audience score) to see the fitness of the model. 
+
+```{r fig6, fig.height=4, fig.width=5}
+p1 <- ggplot() + geom_jitter(data=df, aes(y=.resid, x=critics_score),size = .1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("A. Residual vs Critics score") +ylab("Residuals") + xlab("Critics score")
+p2 <- ggplot() + geom_jitter(data=df, aes(y=.resid, x=audience_score),size = .1) + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + ggtitle("B. Residual vs Audience score") +ylab("Residuals") + xlab("Audience score")
+grid.arrange(p1, p2, nrow = 2, ncol = 1)
+
+```
+
+*Figure 6: A. Residual vs Critics score, B. Residual vs Audience score.* 
+
+
+* * *
+
+## Part 5: Prediction
+
+For prediction the IMDB rating for a new movie from 2016 with our model, we selected **"Moonlight"** which has a score of 8. Its genre is set as "Drama", critics_score = 98%, audience_score = 79%, best_actor_win = no and best_dir_win = no. All these data were taken from Google search. 
+
+```{r }
+new_movie<-data.frame(genre="Drama",critics_score = 98, audience_score = 79, best_actor_win = "no", best_dir_win = "no")
+predict(final_model,new_movie)
+```
+
+
+The real and the predicted IMDB ratings are 8 and 7.5 respectively, a confidence **95%** interval between **6.6** and **8.4**.
+
+```{r }
+predict(final_model, new_movie, interval="predict") 
+```
+
+
+* * *
+
+## Part 6: Conclusion
+
+IMDB is the most famous scoring system on which general public rely before watching a movie.   Determining the popularity of a movie is not simple task. Few essential qualities of a movie seem to have some degree of correlation with its IMDB score. Elseways, some external characteristics, like genre, scores from critics and audience, and best actor and director Oscar winning status also correlated or contributing to IMDB score of that particular movie. One drawback is we only used a subset of numerous features for our initial model, much better model could be modeled using all the set of information or a combination of some important information.
+
+
